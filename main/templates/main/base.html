@@ -1,0 +1,55 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SmartQuiz AI — Boost Your Learning</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Global CSS -->
+  {% block css %}
+  <link rel="stylesheet" href="{% static 'main/style.css' %}">
+  <link rel="stylesheet" href="{% static 'accounts/signup.css' %}">
+  {% endblock %}
+
+  <!-- Toast CSS -->
+  <link rel="stylesheet" href="{% static 'main/toast.css' %}">
+
+</head>
+
+<body>
+
+  <!-- TOAST CONTAINER -->
+  <div class="sq-toast-container" id="sqToastContainer"></div>
+
+  <!-- Django Messages (base level — for non-index pages) -->
+  {% if messages %}
+  <script>
+    const _djangoMessages = [
+      {% for message in messages %}
+      {
+        tag: "{{ message.tags }}",
+        text: "{{ message|escapejs }}",
+        level: "{{ message.tags }}"
+      }{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ];
+  </script>
+  {% endif %}
+
+  <!-- Toast messages block (overridden per page if needed) -->
+  {% block toast_messages %}{% endblock %}
+
+  <!-- Main Content -->
+  {% block content %}{% endblock %}
+
+  <!-- Toast Script -->
+  <script src="{% static 'main/toast.js' %}"></script>
+
+</body>
+</html>

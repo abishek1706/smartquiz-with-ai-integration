@@ -1,0 +1,357 @@
+{%extends 'main/base.html' %}
+{%load static %}
+
+
+{%block css%}
+{%endblock%}
+
+{% block content %}
+
+<link rel="stylesheet" href="{% static 'accounts/dashboard.css' %}">
+<!-- NAV -->
+<nav class="navbar">
+
+  <!-- LEFT -->
+  <div class="nav-left">
+    {% comment %} <div class="nav-logo">SmartQuiz AI</div> {% endcomment %}
+    
+     <span>SmartQuiz <em>with AI</em></span>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="nav-right">
+
+    <a href="{% url 'ai_page' %}" class="nav-item">
+      AI Generator
+    </a>
+
+    <!-- Leaderboard -->
+    <div class="nav-item dropdown-parent">
+      Leaderboard ⌄
+      <div class="dropdown">
+        <div class="dd-item">Global Ranking</div>
+        <div class="dd-item">By Subject</div>
+        <div class="dd-item">Weekly</div>
+      </div>
+    </div>
+
+    <!-- Profile -->
+    <div class="nav-item dropdown-parent">
+      AS ⌄
+      <div class="dropdown">
+        <div class="dd-item">My Profile</div>
+        <div class="dd-item">Settings</div>
+        <a href="{% url 'logout' %}">
+        <div class="dd-item">Log Out</div>
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+</nav>
+
+<!-- MAIN -->
+<main>
+
+  <!-- DASHBOARD VIEW -->
+  <div id="dashView">
+    <div class="page-header">
+      <h1>Good afternoon, Arjun 👋</h1>
+      <p>Click on any subject card below to start your MCQ quiz instantly.</p>
+    </div>
+
+    <div class="sec-label">Your Progress</div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-val">24</div><div class="stat-label">Quizzes Taken</div><div class="stat-delta">↑ 3 this week</div></div>
+      <div class="stat-card"><div class="stat-val">82%</div><div class="stat-label">Avg Score</div><div class="stat-delta">↑ 5% improvement</div></div>
+      <div class="stat-card"><div class="stat-val">140</div><div class="stat-label">AI Questions Generated</div><div class="stat-delta">↑ 20 today</div></div>
+      <div class="stat-card"><div class="stat-val">#7</div><div class="stat-label">Global Rank</div><div class="stat-delta">↑ 2 spots up</div></div>
+    </div>
+{% comment %}
+  Replace the hard-coded subject-grid block in dashboard.html with this snippet.
+  Subjects are now loaded dynamically from the database.
+  The JS quiz logic reads questions from the API: GET /ai/quiz/questions/?subject=<slug>
+{% endcomment %}
+<!-- CTA -->
+<div class="sec-label">Choose a Subject — Click to Start Quiz</div>
+<div class="subject-grid">
+  {% for subject in subjects %}
+  <div class="subject-card" data-sub="{{ subject.slug }}" onclick="startQuiz('{{ subject.slug }}')">
+    <div class="sub-icon">{{ subject.icon }}</div>
+    <div class="sub-name">{{ subject.name }}</div>
+    <div class="sub-desc">{{ subject.description }}</div>
+    <div class="sub-badge">{{ subject.badge }}</div>
+  </div>
+  {% empty %}
+  <p style="color:#888;">No subjects available yet. Ask your admin to add some!</p>
+  {% endfor %}
+</div>
+
+{% comment %}
+----------------------------------------------------------------------
+Add this <script> block at the bottom of dashboard.html (before </body>)
+----------------------------------------------------------------------
+{% endcomment %}
+<script>
+/**
+ * startQuiz(slug)
+ * Fetches questions from the Django API and runs the quiz in a modal.
+ * Depends on: a modal element with id="quiz-modal" already present in your HTML,
+ *             OR the script creates one on the fly (fallback below).
+ */
+async function startQuiz(subject) {
+  try {
+    const res = await fetch(`/ai/quiz/questions/?subject=${subject}`);
+    if (!res.ok) throw new Error('Failed to load questions');
+    const data = await res.json();
+
+    if (!data.questions || data.questions.length === 0) {
+      alert('No questions available for this subject yet. Check back soon!');
+      return;
+    }
+
+    runQuizModal(subject, data.questions);
+  } catch (err) {
+    console.error(err);
+    alert('Could not load quiz. Please try again.');
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Lightweight quiz runner — creates a full-screen overlay            */
+/* ------------------------------------------------------------------ */
+function runQuizModal(subject, questions) {
+  let current = 0;
+  let score   = 0;
+  const total = questions.length;
+
+  // Remove any previous modal
+  const old = document.getElementById('_quiz_overlay');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = '_quiz_overlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:center;justify-content:center;z-index:9999;
+    font-family:inherit;
+  `;
+
+  const box = document.createElement('div');
+  box.style.cssText = `
+    background:#fff;border-radius:16px;padding:36px 40px;
+    max-width:560px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,.25);
+    position:relative;
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  function render() {
+    if (current >= total) {
+      showResult();
+      return;
+    }
+    const q = questions[current];
+    box.innerHTML = `
+      <button onclick="document.getElementById('_quiz_overlay').remove()"
+        style="position:absolute;top:14px;right:18px;background:none;
+               border:none;font-size:22px;cursor:pointer;color:#888">✕</button>
+      <div style="font-size:13px;color:#888;margin-bottom:8px">
+        Question ${current + 1} / ${total} &nbsp;|&nbsp;
+        <span style="text-transform:capitalize">${q.difficulty}</span>
+      </div>
+      <div style="font-size:18px;font-weight:600;margin-bottom:24px;line-height:1.4">
+        ${q.text}
+      </div>
+      <div id="_opts"></div>
+    `;
+
+    const optsDiv = box.querySelector('#_opts');
+    q.options.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.textContent = opt.text;
+      btn.style.cssText = `
+        display:block;width:100%;text-align:left;padding:12px 16px;
+        margin-bottom:10px;border:2px solid #e0e0e0;border-radius:10px;
+        background:#fafafa;cursor:pointer;font-size:15px;transition:.15s;
+      `;
+      btn.onmouseover = () => btn.style.borderColor = '#4f6ef7';
+      btn.onmouseout  = () => { if (!btn.dataset.answered) btn.style.borderColor = '#e0e0e0'; };
+
+      btn.onclick = () => {
+        // Disable all buttons
+        optsDiv.querySelectorAll('button').forEach(b => {
+          b.style.cursor = 'default';
+          b.onclick = null;
+          b.dataset.answered = '1';
+        });
+
+        if (opt.is_correct) {
+          score++;
+          btn.style.cssText += 'border-color:#22c55e;background:#f0fdf4;';
+        } else {
+          btn.style.cssText += 'border-color:#ef4444;background:#fef2f2;';
+          // Highlight correct answer
+          optsDiv.querySelectorAll('button').forEach(b => {
+            if (b.textContent === q.options.find(o => o.is_correct)?.text) {
+              b.style.cssText += 'border-color:#22c55e;background:#f0fdf4;';
+            }
+          });
+        }
+
+        // Show explanation if any
+        if (q.explanation) {
+          const exp = document.createElement('div');
+          exp.style.cssText = `margin-top:14px;padding:12px;background:#f0f9ff;
+            border-radius:8px;font-size:14px;color:#0369a1;`;
+          exp.textContent = '💡 ' + q.explanation;
+          optsDiv.appendChild(exp);
+        }
+
+        // Next button
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = current + 1 < total ? 'Next →' : 'See Results';
+        nextBtn.style.cssText = `
+          margin-top:18px;padding:10px 24px;background:#4f6ef7;color:#fff;
+          border:none;border-radius:8px;cursor:pointer;font-size:15px;float:right;
+        `;
+        nextBtn.onclick = () => { current++; render(); };
+        optsDiv.appendChild(nextBtn);
+      };
+
+      optsDiv.appendChild(btn);
+    });
+  }
+
+  function showResult() {
+    const pct = Math.round((score / total) * 100);
+    const emoji = pct >= 80 ? '🏆' : pct >= 50 ? '👍' : '💪';
+
+    box.innerHTML = `
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:56px">${emoji}</div>
+        <h2 style="margin:12px 0 4px">Quiz Complete!</h2>
+        <p style="color:#555;font-size:16px">
+          You scored <b>${score}</b> out of <b>${total}</b> (${pct}%)
+        </p>
+        <div style="height:12px;background:#e5e7eb;border-radius:99px;margin:20px 0">
+          <div style="height:100%;width:${pct}%;background:#4f6ef7;
+                      border-radius:99px;transition:width .6s"></div>
+        </div>
+        <button onclick="document.getElementById('_quiz_overlay').remove()"
+          style="padding:12px 28px;background:#4f6ef7;color:#fff;border:none;
+                 border-radius:10px;cursor:pointer;font-size:16px;margin-right:10px">
+          Close
+        </button>
+        <button onclick="startQuiz('${subject}')"
+          style="padding:12px 28px;background:#f3f4f6;color:#333;border:none;
+                 border-radius:10px;cursor:pointer;font-size:16px">
+          Retry
+        </button>
+      </div>
+    `;
+
+    // Submit score to backend (fire-and-forget)
+    fetch('/ai/quiz/submit/', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+      body: JSON.stringify({subject, score, total}),
+    }).catch(() => {/* silently ignore */});
+  }
+
+  render();
+}
+
+function getCookie(name) {
+  const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return m ? m.pop() : '';
+}
+</script>
+    
+
+    <div class="sec-label">Quick Actions</div>
+    <div class="actions-grid">
+      <div class="action-card" onclick="showToast('Click a subject card above to take a quiz.')">
+        <div class="act-icon blue"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+  
+        <div class="act-text"><strong>Take a Quiz</strong><span>Test your knowledge with subject-specific MCQs.</span></div>
+        
+      </div>
+      <div class="action-card" onclick="showToast('AI Question Generator coming soon...')">
+        <div class="act-icon amber"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <div class="act-text"><strong>AI Question Generator</strong><span>Generate custom practice questions instantly.</span></div>
+      </div>
+      <div class="action-card" onclick="showToast('Loading Leaderboard...')">
+        <div class="act-icon green"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="18 20 18 10"/><polyline points="12 20 12 4"/><polyline points="6 20 6 14"/></svg></div>
+        <div class="act-text"><strong>View Leaderboard</strong><span>See where you rank against other learners.</span></div>
+      </div>
+      <div class="action-card" onclick="showToast('Loading your results...')">
+        <div class="act-icon purple"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <div class="act-text"><strong>My Results</strong><span>Review past quiz scores and performance trends.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUIZ VIEW -->
+  <div id="quizView" style="display:none;">
+    <button class="back-link" onclick="goToDashboard()">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Dashboard
+    </button>
+
+    <div class="quiz-top">
+      <div class="quiz-title">MCQ Quiz — <span class="sub-pill" id="qSubjectPill">Python</span></div>
+      <div class="quiz-meta-txt" id="qMeta">Question 1 of 5</div>
+    </div>
+
+    <div class="prog-wrap"><div class="prog-fill" id="progBar" style="width:20%"></div></div>
+
+    <!-- Question card -->
+    <div class="q-card" id="qCard">
+      <div class="q-num" id="qNum">Question 1</div>
+      <div class="q-text" id="qText"></div>
+      <div class="opts" id="optsList"></div>
+      <div class="feedback" id="feedbackBox"></div>
+      <div class="q-footer">
+        <span class="quiz-meta-txt" id="scoreTrack">Score: 0 / 0</span>
+        <button class="btn btn-primary" id="nextBtn" onclick="nextQ()" style="display:none;">Next Question →</button>
+      </div>
+    </div>
+
+    <!-- Score card -->
+    <div class="score-card" id="scoreCard">
+      <div class="score-ring">
+        <span class="sc-num" id="scNum">0</span>
+        <span class="sc-den" id="scDen">/5</span>
+      </div>
+      <h2 id="scTitle">Quiz Complete!</h2>
+      <p id="scMsg"></p>
+      <div class="score-acts">
+        <button class="btn btn-ghost" onclick="goToDashboard()">← Back to Dashboard</button>
+        <button class="btn btn-primary" onclick="retryQuiz()">Retry Quiz</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Logout Modal -->
+<div class="modal-overlay" id="logoutOverlay" onclick="if(event.target===this)closeLogout()">
+  <div class="modal">
+    <h2>Log Out</h2>
+    <p>Are you sure you want to log out of your account?</p>
+    <div class="modal-acts">
+      {% comment %} <button class="btn btn-ghost" onclick="closeLogout()">Cancel</button> {% endcomment %}
+     <a href="{% url 'logout' %}">
+  <button class="btn btn-danger">Log Out</button>
+</a>
+    </div>
+  </div>
+</div>
+
+
+ <script src="{% static 'accounts/dashboard.js' %}"></script>
+{%endblock content%}
+
