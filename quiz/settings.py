@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-prd#*+@&3als1_pophbjzk_+xt63okvn7sjpn19qz#7z663wo5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['quiz.onrender.com']
 
 
 # Application definition
@@ -122,6 +122,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT='static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 AUTH_USER_MODEL = "accounts.MyUser"
 
