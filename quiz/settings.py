@@ -28,7 +28,7 @@ SECRET_KEY = 'django-insecure-prd#*+@&3als1_pophbjzk_+xt63okvn7sjpn19qz#7z663wo5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['quiz.onrender.com']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
